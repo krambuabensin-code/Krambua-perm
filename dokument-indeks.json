@@ -6,7 +6,8 @@
     "filnamn": "Krambua_IK-mat.docx",
     "filtype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "storleik": 19024,
-    "sti": "ikmat2026-Krambua_IK-mat.docx",
+    "sti": "dokument/ikmat2026-Krambua_IK-mat.docx",
+    "sideSti": "dokument/ikmat2026-side.html",
     "mottakarar": [],
     "lastOpp": 1755700000000,
     "krevSignatur": true
@@ -18,9 +19,36 @@
     "filnamn": "Krambua_HMS-handbok.docx",
     "filtype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "storleik": 13732,
-    "sti": "hms2026-Krambua_HMS-handbok.docx",
+    "sti": "dokument/hms2026-Krambua_HMS-handbok.docx",
+    "sideSti": "dokument/hms2026-side.html",
     "mottakarar": [],
     "lastOpp": 1755800000000,
+    "krevSignatur": true
+  },
+  {
+    "id": "legemiddel2026",
+    "tittel": "Sal av legemiddel utan resept",
+    "kategori": "HMS",
+    "filnamn": "Krambua_Legemiddelsal.docx",
+    "filtype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "storleik": 11778,
+    "sti": "dokument/legemiddel2026-Krambua_Legemiddelsal.docx",
+    "sideSti": "dokument/legemiddel2026-side.html",
+    "mottakarar": [],
+    "lastOpp": 1755900000000,
+    "krevSignatur": true
+  },
+  {
+    "id": "forstehjelp2026",
+    "tittel": "Førstehjelp",
+    "kategori": "HMS",
+    "filnamn": "Krambua_Forstehjelp.docx",
+    "filtype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "storleik": 12262,
+    "sti": "dokument/forstehjelp2026-Krambua_Forstehjelp.docx",
+    "sideSti": "dokument/forstehjelp2026-side.html",
+    "mottakarar": [],
+    "lastOpp": 1755900100000,
     "krevSignatur": true
   }
 ]

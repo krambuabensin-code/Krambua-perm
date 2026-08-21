@@ -435,6 +435,78 @@ function signeringsBlokk(d) {
 }
 const RAUD_TEKST = "#D6222A";
 
+/* ---------- Vis dokument i nettlesar ---------- */
+
+function girVisningsUrl(filnamn, rawFileUrl) {
+  const ext = (filnamn.split(".").pop() || "").toLowerCase();
+  const officePakke = ["doc", "docx", "ppt", "pptx", "xls", "xlsx"];
+  if (officePakke.includes(ext)) {
+    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(rawFileUrl)}`;
+  }
+  return rawFileUrl; // PDF, bilete m.m. — nettlesaren viser desse sjølv
+}
+
+function kanVisast(filnamn) {
+  const ext = (filnamn.split(".").pop() || "").toLowerCase();
+  return ["doc", "docx", "ppt", "pptx", "xls", "xlsx", "pdf", "png", "jpg", "jpeg", "gif", "txt"].includes(ext);
+}
+
+async function visDokumentModal(d) {
+  const raw = await rawUrl(d.sti);
+  const visningsUrl = girVisningsUrl(d.filnamn, raw);
+
+  const bakgrunn = document.createElement("div");
+  bakgrunn.className = "modal-bakgrunn";
+  bakgrunn.innerHTML = `
+    <div class="modal" style="max-width:900px;width:96%;height:88dvh;display:flex;flex-direction:column;padding:14px;">
+      <div class="modal-topp" style="margin-bottom:8px;">
+        <h2 style="font-size:15.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.tittel)}</h2>
+        <button id="lukk-vis-modal">✕</button>
+      </div>
+      <div style="flex:1;min-height:0;border:1px solid #e4e0d4;border-radius:8px;overflow:hidden;background:#f5f4ef;position:relative;">
+        <div id="vis-lastar" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#8a8980;">Opnar dokument …</div>
+        <iframe id="vis-iframe" src="${visningsUrl}" style="width:100%;height:100%;border:none;position:relative;z-index:1;" onload="document.getElementById('vis-lastar')?.remove()"></iframe>
+      </div>
+      <button id="vis-nedlast-knapp" class="knapp-liten" style="margin-top:10px;align-self:flex-start;">Last ned i staden</button>
+    </div>
+  `;
+  document.body.appendChild(bakgrunn);
+  document.getElementById("lukk-vis-modal").onclick = () => bakgrunn.remove();
+  document.getElementById("vis-nedlast-knapp").onclick = () => lastNedDokument(d);
+}
+
+/* ---------- Integrert dokumentside (les i appen, ikkje via filvisar) ---------- */
+
+async function visIntegrertSide(d) {
+  const rot = document.getElementById("innhald");
+  rot.innerHTML = `
+    <button class="side-tilbake" id="side-tilbake-knapp">← Tilbake</button>
+    <div class="side-topp">
+      <h1>${escapeHtml(d.tittel)}</h1>
+      <button id="side-nedlast-knapp" class="knapp-liten">Last ned original</button>
+    </div>
+    <div class="dok-side" id="side-innhald-rot">Lastar innhald …</div>
+  `;
+  document.getElementById("side-tilbake-knapp").onclick = () => renderInnhald();
+  document.getElementById("side-nedlast-knapp").onclick = () => lastNedDokument(d);
+
+  const målEl = document.getElementById("side-innhald-rot");
+  try {
+    let html;
+    try {
+      const r = await hentFilInnhald(d.sideSti);
+      html = r.tekst;
+    } catch (e) {
+      const res = await fetch(await rawUrl(d.sideSti));
+      if (!res.ok) throw new Error("Fann ikkje sideinnhaldet");
+      html = await res.text();
+    }
+    målEl.innerHTML = html;
+  } catch (e) {
+    målEl.innerHTML = `<p style="color:#8a8980;">Klarte ikkje å laste sideinnhaldet. Prøv «Last ned original» i staden.</p>`;
+  }
+}
+
 function lagDokRad(d, adminModus) {
   const rad = document.createElement("div");
   rad.className = "dok-rad";
@@ -450,6 +522,15 @@ function lagDokRad(d, adminModus) {
   `;
   const knappar = document.createElement("div");
   knappar.className = "knappar";
+
+  if (kanVisast(d.filnamn) || d.sideSti) {
+    const visKnapp = document.createElement("button");
+    visKnapp.className = "knapp-liten";
+    visKnapp.textContent = d.sideSti ? "Les" : "Vis";
+    visKnapp.onclick = () => (d.sideSti ? visIntegrertSide(d) : visDokumentModal(d));
+    knappar.appendChild(visKnapp);
+  }
+
   const nedKnapp = document.createElement("button");
   nedKnapp.className = "knapp-liten";
   nedKnapp.textContent = "Last ned";
