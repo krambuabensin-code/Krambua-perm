@@ -5,7 +5,7 @@
 //   REPO: "krambua-perm",
 //   GREIN: "main",
 const KRAMBUA_CONFIG = {
-  OWNER: "kristoffertungesvik-stack",
+  OWNER: "krambuabensin-code",
   REPO: "krambua-perm",
   GREIN: "main",
   // E-postadressa du (admin) vil at signaturar skal sendast til.
