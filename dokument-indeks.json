@@ -10,5 +10,17 @@
     "mottakarar": [],
     "lastOpp": 1755700000000,
     "krevSignatur": true
+  },
+  {
+    "id": "hms2026",
+    "tittel": "HMS-handbok",
+    "kategori": "HMS",
+    "filnamn": "Krambua_HMS-handbok.docx",
+    "filtype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "storleik": 13732,
+    "sti": "hms2026-Krambua_HMS-handbok.docx",
+    "mottakarar": [],
+    "lastOpp": 1755800000000,
+    "krevSignatur": true
   }
 ]
