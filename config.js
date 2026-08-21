@@ -8,4 +8,6 @@ const KRAMBUA_CONFIG = {
   OWNER: "kristoffertungesvik-stack",
   REPO: "krambua-perm",
   GREIN: "main",
+  // E-postadressa du (admin) vil at signaturar skal sendast til.
+  ADMIN_EPOST: "din-epost@eksempel.no",
 };

@@ -84,6 +84,11 @@ button { font-family: inherit; touch-action: manipulation; }
   padding: 8px 12px; border-radius: 7px; font-size: 12.5px; cursor: pointer; white-space: nowrap;
 }
 #app-topp button:active { background: #2c2c26; }
+.knapp-avvik {
+  background: #D6222A !important; border-color: #D6222A !important; color: #fff !important;
+  font-weight: 700;
+}
+.knapp-avvik:active { background: var(--raud-mork) !important; }
 
 #innhald { max-width: 720px; margin: 0 auto; padding: 18px 14px calc(50px + var(--safe-b)); }
 
@@ -241,4 +246,9 @@ button { font-family: inherit; touch-action: manipulation; }
 @media (max-width: 639px) {
   .dok-rad .tittel { white-space: normal; }
   .grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 430px) {
+  #app-topp .brukar { display: none; }
+  #app-topp button { padding: 8px 10px; }
 }

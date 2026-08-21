@@ -54,6 +54,35 @@ eit passord du vel sjølv, og gje det til den tilsette munnleg eller på ein
 lapp. Dei treng **ingen GitHub-konto** — dei går berre til nettsida og
 loggar inn med det du har gjeve dei.
 
+## 7. Signering av dokument (t.d. IK-mat)
+
+Sida har fått ei enkel signeringsløysing. Når du krysser av **"Krev
+signatur frå tilsette"** ved opplasting, får dokumentet ein raud "Krev
+signatur"-merkelapp og ein Signer-knapp for tilsette.
+
+**Slik fungerer det:** Sidan tilsette ikkje har skrivetilgang til
+GitHub (det er nettopp det som gjer løysinga enkel og trygg), skriv ikkje
+appen signaturen rett inn i repoet. I staden opnar Signer-knappen
+e-postappen på eininga deira, ferdig utfylt med namn, brukarnamn og
+tidspunkt, adressert til deg. Du får altså éin e-post per signatur som
+kvittering/dokumentasjon. Set eiga e-postadresse i `site/config.js` under
+`ADMIN_EPOST`.
+
+Dette er ei lettvekts-løysing — ho krev at den tilsette faktisk trykkjer
+"Send" i e-postappen sin. Vil du ha ei løysing der signaturane blir lagra
+og synlege inne i appen for alle, krev det at tilsette òg får ein
+skrivetilgang (t.d. via GitHub-konto, som i den tryggare varianten vi
+vurderte tidlegare) — sei ifrå om du vil ha det i staden.
+
+## 8. Avviksmeldingar
+
+Alle innlogga (både admin og tilsette) har no ein raud **"⚠ Meld
+avvik"**-knapp øvst på sida. Han opnar eit skjema (dato, kategori,
+skildring, korrigerande tiltak, meldt av) og sender det som e-post til
+same `ADMIN_EPOST` som signaturane, same prinsipp: appen skriv ikkje
+direkte til repoet, så du får meldinga i innboksen din med det same nokon
+trykkjer send.
+
 ## Viktig å vite
 
 - Passorda blir aldri lagra i klartekst i repoet (dei blir "hasha"), men

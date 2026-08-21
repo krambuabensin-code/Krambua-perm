@@ -179,7 +179,7 @@ async function slettDokument(doc) {
   renderInnhald();
 }
 
-async function lastOppDokument({ fil, tittel, kategori, mottakarar }) {
+async function lastOppDokument({ fil, tittel, kategori, mottakarar, krevSignatur }) {
   const b64 = await fileToBase64(fil);
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const trygtFilnamn = fil.name.replace(/[^a-zA-Z0-9æøåÆØÅ_.-]/g, "_");
@@ -200,6 +200,7 @@ async function lastOppDokument({ fil, tittel, kategori, mottakarar }) {
     storleik: fil.size,
     sti,
     mottakarar,
+    krevSignatur: !!krevSignatur,
     lastOpp: Date.now(),
   };
   await lagreIndeks([...staten.dokIndeks, nyPost], `Legg til ${tittel} i indeksen`);
@@ -333,17 +334,81 @@ function renderTilsett(rot) {
   });
 }
 
-const KAT_IKON = { HMS: "🦺", Reglar: "📋", Rutinar: "🔁", Arbeidskontrakt: "📄", Anna: "🗂" };
+function signertNokkel(dokId) {
+  return `krambua-signert-${staten.brukarnamn}-${dokId}`;
+}
+
+function harSignert(dokId) {
+  return localStorage.getItem(signertNokkel(dokId)) === "1";
+}
+
+function apnSigneringModal(d) {
+  const bakgrunn = document.createElement("div");
+  bakgrunn.className = "modal-bakgrunn";
+  bakgrunn.innerHTML = `
+    <div class="modal">
+      <div class="modal-topp">
+        <h2 style="font-size:17px;">Signer dokument</h2>
+        <button id="lukk-sign-modal">✕</button>
+      </div>
+      <p style="font-size:13.5px;color:#5a594e;line-height:1.5;margin:0 0 16px;">
+        Du signerer «${escapeHtml(d.tittel)}». Ei stadfesting blir sendt til administrator på e-post — hugs å lasta ned og lesa dokumentet først.
+      </p>
+      <div class="felt">
+        <label>Fullt namn (signatur)</label>
+        <input id="sign-namn" class="tekstfelt" value="${escapeHtml(staten.namn)}" />
+      </div>
+      <label style="display:flex;align-items:flex-start;gap:9px;font-size:13.5px;margin-bottom:16px;line-height:1.4;">
+        <input type="checkbox" id="sign-stadfest" style="margin-top:2px;accent-color:#D6222A;" />
+        Eg stadfestar at eg har lese og forstått innhaldet i dette dokumentet.
+      </label>
+      <div id="sign-feil" class="login-feil"></div>
+      <button id="sign-knapp" class="knapp-raud" style="width:100%;">Signer og send</button>
+    </div>
+  `;
+  document.body.appendChild(bakgrunn);
+  document.getElementById("lukk-sign-modal").onclick = () => bakgrunn.remove();
+  document.getElementById("sign-knapp").onclick = () => {
+    const namn = document.getElementById("sign-namn").value.trim();
+    const stadfest = document.getElementById("sign-stadfest").checked;
+    const feilEl = document.getElementById("sign-feil");
+    if (!namn) return (feilEl.textContent = "Skriv namnet ditt.");
+    if (!stadfest) return (feilEl.textContent = "Du må krysse av for stadfesting.");
+
+    const no = new Date().toLocaleString("nb-NO");
+    const emne = encodeURIComponent(`Signatur: ${d.tittel}`);
+    const kropp = encodeURIComponent(
+      `${namn} (brukarnamn: ${staten.brukarnamn}) stadfestar å ha lese og forstått «${d.tittel}».\n\nTidspunkt: ${no}`
+    );
+    window.location.href = `mailto:${KRAMBUA_CONFIG.ADMIN_EPOST}?subject=${emne}&body=${kropp}`;
+
+    localStorage.setItem(signertNokkel(d.id), "1");
+    bakgrunn.remove();
+    visToast("Signatur klargjort — fullfør sendinga i e-postappen din");
+    renderInnhald();
+  };
+}
+
+function signeringsBlokk(d) {
+  if (!d.krevSignatur) return "";
+  if (harSignert(d.id)) {
+    return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#1a7a3c;font-weight:700;margin-top:4px;">✓ Signert</span>`;
+  }
+  return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:${RAUD_TEKST};font-weight:700;margin-top:4px;">● Krev signatur</span>`;
+}
+const RAUD_TEKST = "#D6222A";
 
 function lagDokRad(d, adminModus) {
   const rad = document.createElement("div");
   rad.className = "dok-rad";
+  rad.style.alignItems = "flex-start";
   const mottakarTekst = d.mottakarar.length === 0 ? "Felles (alle tilsette)" : `Til: ${d.mottakarar.join(", ")}`;
   rad.innerHTML = `
     <div class="ikon-fil">${KAT_IKON[d.kategori] || "📄"}</div>
     <div class="info">
       <div class="tittel">${escapeHtml(d.tittel)}</div>
       <div class="meta">${adminModus ? `${d.kategori} · ` : ""}${fmtBytes(d.storleik)} · ${new Date(d.lastOpp).toLocaleDateString("nb-NO")}${adminModus ? " · " + mottakarTekst : ""}</div>
+      ${!adminModus ? signeringsBlokk(d) : d.krevSignatur ? '<span style="display:inline-block;font-size:11px;color:#8a8980;margin-top:4px;">Krev signatur frå tilsette</span>' : ""}
     </div>
   `;
   const knappar = document.createElement("div");
@@ -353,6 +418,16 @@ function lagDokRad(d, adminModus) {
   nedKnapp.textContent = "Last ned";
   nedKnapp.onclick = () => lastNedDokument(d);
   knappar.appendChild(nedKnapp);
+
+  if (!adminModus && d.krevSignatur && !harSignert(d.id)) {
+    const signKnapp = document.createElement("button");
+    signKnapp.className = "knapp-raud";
+    signKnapp.style.padding = "9px 13px";
+    signKnapp.style.fontSize = "12.5px";
+    signKnapp.textContent = "Signer";
+    signKnapp.onclick = () => apnSigneringModal(d);
+    knappar.appendChild(signKnapp);
+  }
 
   if (adminModus) {
     const slettKnapp = document.createElement("button");
@@ -559,6 +634,12 @@ async function visLastOppModal() {
           }
         </div>
       </div>
+      <div class="felt">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:400;">
+          <input type="checkbox" id="felt-krev-sign" style="accent-color:#D6222A;" />
+          Krev signatur frå tilsette
+        </label>
+      </div>
       <div id="modal-feil" class="login-feil"></div>
       <button id="last-opp-knapp" class="knapp-raud" style="width:100%;">Last opp</button>
     </div>
@@ -582,6 +663,7 @@ async function visLastOppModal() {
     const tittel = document.getElementById("felt-tittel").value.trim();
     const kategori = document.getElementById("felt-kategori").value;
     const felles = document.getElementById("felt-felles").checked;
+    const krevSignatur = document.getElementById("felt-krev-sign").checked;
     const valde = Array.from(document.querySelectorAll("#tilsette-liste input:checked")).map((i) => i.value);
 
     if (!fil) return (feilEl.textContent = "Vel ein fil.");
@@ -593,7 +675,7 @@ async function visLastOppModal() {
     knapp.disabled = true;
     knapp.textContent = "Lastar opp …";
     try {
-      await lastOppDokument({ fil, tittel, kategori, mottakarar: felles ? [] : valde });
+      await lastOppDokument({ fil, tittel, kategori, mottakarar: felles ? [] : valde, krevSignatur });
       bakgrunn.remove();
       visToast("Dokument lasta opp");
       renderInnhald();
@@ -605,12 +687,80 @@ async function visLastOppModal() {
   };
 }
 
+/* ---------- Avviksmeldingar ---------- */
+
+const AVVIK_KAT = ["Mat/hygiene", "Reinhald", "Utstyr/vedlikehald", "Tryggleik/HMS", "Anna"];
+
+function apnAvviksmeldingModal() {
+  const idagIso = new Date().toISOString().slice(0, 10);
+  const bakgrunn = document.createElement("div");
+  bakgrunn.className = "modal-bakgrunn";
+  bakgrunn.innerHTML = `
+    <div class="modal">
+      <div class="modal-topp">
+        <h2 style="font-size:17px;">Meld avvik</h2>
+        <button id="lukk-avvik-modal">✕</button>
+      </div>
+      <div class="felt">
+        <label>Dato</label>
+        <input id="avvik-dato" type="date" class="tekstfelt" value="${idagIso}" />
+      </div>
+      <div class="felt">
+        <label>Kategori</label>
+        <select id="avvik-kategori" class="tekstfelt">${AVVIK_KAT.map((k) => `<option>${k}</option>`).join("")}</select>
+      </div>
+      <div class="felt">
+        <label>Kva skjedde?</label>
+        <textarea id="avvik-skildring" rows="4" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Skildre kort kva som var avviket …"></textarea>
+      </div>
+      <div class="felt">
+        <label>Korrigerande tiltak (om gjort / planlagt)</label>
+        <textarea id="avvik-tiltak" rows="3" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Kva vart gjort, eller kva bør gjerast?"></textarea>
+      </div>
+      <div class="felt">
+        <label>Meldt av</label>
+        <input id="avvik-namn" class="tekstfelt" value="${escapeHtml(staten.namn || "")}" />
+      </div>
+      <div id="avvik-feil" class="login-feil"></div>
+      <button id="avvik-send-knapp" class="knapp-raud" style="width:100%;">Send avviksmelding</button>
+    </div>
+  `;
+  document.body.appendChild(bakgrunn);
+  document.getElementById("lukk-avvik-modal").onclick = () => bakgrunn.remove();
+  document.getElementById("avvik-send-knapp").onclick = () => {
+    const dato = document.getElementById("avvik-dato").value;
+    const kategori = document.getElementById("avvik-kategori").value;
+    const skildring = document.getElementById("avvik-skildring").value.trim();
+    const tiltak = document.getElementById("avvik-tiltak").value.trim();
+    const namn = document.getElementById("avvik-namn").value.trim();
+    const feilEl = document.getElementById("avvik-feil");
+    feilEl.textContent = "";
+    if (!dato) return (feilEl.textContent = "Vel ein dato.");
+    if (!skildring) return (feilEl.textContent = "Skriv kva som skjedde.");
+    if (!namn) return (feilEl.textContent = "Skriv kven som melder avviket.");
+
+    const emne = encodeURIComponent(`Avviksmelding: ${kategori} — ${dato}`);
+    const kropp = encodeURIComponent(
+      `AVVIKSMELDING — Krambua\n\n` +
+        `Dato: ${dato}\n` +
+        `Kategori: ${kategori}\n` +
+        `Meldt av: ${namn} (brukarnamn: ${staten.brukarnamn})\n\n` +
+        `Kva skjedde:\n${skildring}\n\n` +
+        `Korrigerande tiltak:\n${tiltak || "(ikkje fylt ut)"}\n`
+    );
+    window.location.href = `mailto:${KRAMBUA_CONFIG.ADMIN_EPOST}?subject=${emne}&body=${kropp}`;
+    bakgrunn.remove();
+    visToast("Avviksmelding klargjort — fullfør sendinga i e-postappen din");
+  };
+}
+
 /* ---------- Oppstart ---------- */
 
 window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("login-knapp").onclick = forsokInnlogging;
   document.getElementById("token-knapp").onclick = forsokToken;
   document.getElementById("logg-ut-knapp").onclick = loggUt;
+  document.getElementById("avvik-knapp").onclick = apnAvviksmeldingModal;
   document.getElementById("laster").classList.add("skjult");
   document.getElementById("innlogging").classList.remove("skjult");
 });
