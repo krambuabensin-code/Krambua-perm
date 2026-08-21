@@ -102,12 +102,40 @@ async function ghFetch(sti, opts = {}) {
   });
 }
 
+/* ---------- Ferske filoppslag (Contents API, ikkje mellomlagra som raw.githubusercontent.com) ---------- */
+
+async function hentFilInnhald(sti) {
+  const headers = { Accept: "application/vnd.github+json" };
+  if (staten.adminToken) headers.Authorization = `Bearer ${staten.adminToken}`;
+  const res = await fetch(
+    `${API}/repos/${KRAMBUA_CONFIG.OWNER}/${KRAMBUA_CONFIG.REPO}/contents/${sti}`,
+    { headers }
+  );
+  if (!res.ok) {
+    const feil = new Error(`HTTP ${res.status}`);
+    feil.status = res.status;
+    throw feil;
+  }
+  const data = await res.json();
+  const tekst = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ""))));
+  return { tekst, sha: data.sha };
+}
+
 /* ---------- Kontoar (accounts.json) ---------- */
 
 async function lastInnKontoar() {
-  const res = await fetch(await rawUrl(KONTOAR_STI));
-  if (!res.ok) throw new Error(`Fann ikkje accounts.json i repoet (HTTP ${res.status}). Sjekk at repoet er offentleg, at OWNER/REPO i config.js er rett, og at accounts.json ligg i rota av repoet.`);
-  return res.json();
+  try {
+    const { tekst } = await hentFilInnhald(KONTOAR_STI);
+    return JSON.parse(tekst);
+  } catch (e) {
+    // Fell tilbake til den (moglegvis nokre minutt gamle) raw-adressa
+    // dersom API-oppslaget feilar, t.d. på grunn av rategrense.
+    const res = await fetch(await rawUrl(KONTOAR_STI));
+    if (!res.ok) {
+      throw new Error(`Fann ikkje accounts.json i repoet (HTTP ${res.status}). Sjekk at repoet er offentleg, at OWNER/REPO i config.js er rett, og at accounts.json ligg i rota av repoet.`);
+    }
+    return res.json();
+  }
 }
 
 async function lagreKontoar(nyeKontoar, melding) {
@@ -130,8 +158,13 @@ async function lagreKontoar(nyeKontoar, melding) {
 /* ---------- Dokumentindeks ---------- */
 
 async function lastInnIndeks() {
-  const res = await fetch(await rawUrl(INDEKS_STI));
-  staten.dokIndeks = res.ok ? await res.json() : [];
+  try {
+    const { tekst } = await hentFilInnhald(INDEKS_STI);
+    staten.dokIndeks = JSON.parse(tekst);
+  } catch (e) {
+    const res = await fetch(await rawUrl(INDEKS_STI));
+    staten.dokIndeks = res.ok ? await res.json() : [];
+  }
 }
 
 async function lagreIndeks(nyIndeks, melding) {
@@ -265,14 +298,16 @@ async function forsokToken() {
 
   const res = await ghFetch(`/repos/${KRAMBUA_CONFIG.OWNER}/${KRAMBUA_CONFIG.REPO}`);
   if (!res.ok) {
-    feilEl.textContent = "Fekk ikkje tilgang med dette tokenet. Sjekk at det er gyldig og har skriveløyve.";
+    feilEl.textContent =
+      res.status === 404
+        ? "Fann ikkje repoet med dette tokenet. Sjekk at OWNER/REPO i config.js er rett, og at tokenet har tilgang til nettopp dette repoet."
+        : `Fekk ikkje kontakt (HTTP ${res.status}). Sjekk at tokenet er gyldig og ikkje utløpt.`;
     return;
   }
-  const data = await res.json();
-  if (!data.permissions || !data.permissions.push) {
-    feilEl.textContent = "Dette tokenet har ikkje skriveløyve på repoet.";
-    return;
-  }
+  // Merk: fine-grained token gjev ikkje alltid att eit pålitileg
+  // permissions-felt her, så vi stolar på at token+repo-tilgang held —
+  // ei eventuell mangel på skriveløyve viser seg i klar tekst om admin
+  // faktisk prøver å lagre noko.
   if (document.getElementById("hugs-meg").checked) {
     localStorage.setItem("krambua-admin-token", token);
   } else {
@@ -688,17 +723,22 @@ async function visLastOppModal() {
 }
 
 /* ---------- Avviksmeldingar ---------- */
+/* Feltoppsett følgjer Krambua sitt eige "Skjema for å registrere avvik". */
 
-const AVVIK_KAT = ["Mat/hygiene", "Reinhald", "Utstyr/vedlikehald", "Tryggleik/HMS", "Anna"];
+function avviksNr() {
+  const n = new Date();
+  return `${n.getFullYear()}${String(n.getMonth() + 1).padStart(2, "0")}${String(n.getDate()).padStart(2, "0")}-${String(n.getHours()).padStart(2, "0")}${String(n.getMinutes()).padStart(2, "0")}`;
+}
 
 function apnAvviksmeldingModal() {
   const idagIso = new Date().toISOString().slice(0, 10);
+  const nr = avviksNr();
   const bakgrunn = document.createElement("div");
   bakgrunn.className = "modal-bakgrunn";
   bakgrunn.innerHTML = `
     <div class="modal">
       <div class="modal-topp">
-        <h2 style="font-size:17px;">Meld avvik</h2>
+        <h2 style="font-size:17px;">Meld avvik <span style="color:#8a8980;font-weight:400;font-size:13px;">#${nr}</span></h2>
         <button id="lukk-avvik-modal">✕</button>
       </div>
       <div class="felt">
@@ -706,21 +746,46 @@ function apnAvviksmeldingModal() {
         <input id="avvik-dato" type="date" class="tekstfelt" value="${idagIso}" />
       </div>
       <div class="felt">
-        <label>Kategori</label>
-        <select id="avvik-kategori" class="tekstfelt">${AVVIK_KAT.map((k) => `<option>${k}</option>`).join("")}</select>
+        <label>Avviket vurderast som</label>
+        <div style="display:flex;gap:8px;">
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #ddd9cd;border-radius:8px;padding:10px 6px;font-size:13px;cursor:pointer;">
+            <input type="radio" name="avvik-alvor" value="Mindre" checked /> Mindre
+          </label>
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #ddd9cd;border-radius:8px;padding:10px 6px;font-size:13px;cursor:pointer;">
+            <input type="radio" name="avvik-alvor" value="Større" /> Større
+          </label>
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #f0d3d0;border-radius:8px;padding:10px 6px;font-size:13px;cursor:pointer;color:#D6222A;font-weight:600;">
+            <input type="radio" name="avvik-alvor" value="Kritisk" /> Kritisk
+          </label>
+        </div>
       </div>
       <div class="felt">
-        <label>Kva skjedde?</label>
-        <textarea id="avvik-skildring" rows="4" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Skildre kort kva som var avviket …"></textarea>
+        <label>Kven oppdaga feilen</label>
+        <input id="avvik-oppdaga" class="tekstfelt" value="${escapeHtml(staten.namn || "")}" />
       </div>
       <div class="felt">
-        <label>Korrigerande tiltak (om gjort / planlagt)</label>
-        <textarea id="avvik-tiltak" rows="3" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Kva vart gjort, eller kva bør gjerast?"></textarea>
+        <label>Kven skal feilen rapporterast til</label>
+        <input id="avvik-rapportert-til" class="tekstfelt" value="Dagleg leiar" />
       </div>
       <div class="felt">
-        <label>Meldt av</label>
-        <input id="avvik-namn" class="tekstfelt" value="${escapeHtml(staten.namn || "")}" />
+        <label>Beskriv feilen / det som gjekk gale</label>
+        <textarea id="avvik-skildring" rows="3" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Kva skjedde, kor, når …"></textarea>
       </div>
+      <div class="felt">
+        <label>Avviksbehandling — kva gjorde du umiddelbart</label>
+        <textarea id="avvik-umiddelbart" rows="3" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Kva vart gjort med det same avviket vart oppdaga?"></textarea>
+      </div>
+      <div class="felt">
+        <label>Mogleg årsak (om du veit/trur noko)</label>
+        <textarea id="avvik-arsak" rows="2" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Valfritt — kan òg fyllast ut av leiar i etterkant"></textarea>
+      </div>
+      <div class="felt">
+        <label>Forslag til korrigerande tiltak (for å hindre gjentaking)</label>
+        <textarea id="avvik-tiltak" rows="2" class="tekstfelt" style="resize:vertical;font-family:inherit;" placeholder="Valfritt — kan òg fyllast ut av leiar i etterkant"></textarea>
+      </div>
+      <p style="font-size:11.5px;color:#8a8980;margin:0 0 14px;line-height:1.5;">
+        Feltet «korrigerande tiltak er gjennomført» på det trykte skjemaet fyller leiar ut i etterkant, når avviket er lukka.
+      </p>
       <div id="avvik-feil" class="login-feil"></div>
       <button id="avvik-send-knapp" class="knapp-raud" style="width:100%;">Send avviksmelding</button>
     </div>
@@ -729,24 +794,32 @@ function apnAvviksmeldingModal() {
   document.getElementById("lukk-avvik-modal").onclick = () => bakgrunn.remove();
   document.getElementById("avvik-send-knapp").onclick = () => {
     const dato = document.getElementById("avvik-dato").value;
-    const kategori = document.getElementById("avvik-kategori").value;
+    const alvor = document.querySelector('input[name="avvik-alvor"]:checked').value;
+    const oppdaga = document.getElementById("avvik-oppdaga").value.trim();
+    const rapportertTil = document.getElementById("avvik-rapportert-til").value.trim();
     const skildring = document.getElementById("avvik-skildring").value.trim();
+    const umiddelbart = document.getElementById("avvik-umiddelbart").value.trim();
+    const arsak = document.getElementById("avvik-arsak").value.trim();
     const tiltak = document.getElementById("avvik-tiltak").value.trim();
-    const namn = document.getElementById("avvik-namn").value.trim();
     const feilEl = document.getElementById("avvik-feil");
     feilEl.textContent = "";
     if (!dato) return (feilEl.textContent = "Vel ein dato.");
+    if (!oppdaga) return (feilEl.textContent = "Skriv kven som oppdaga feilen.");
     if (!skildring) return (feilEl.textContent = "Skriv kva som skjedde.");
-    if (!namn) return (feilEl.textContent = "Skriv kven som melder avviket.");
 
-    const emne = encodeURIComponent(`Avviksmelding: ${kategori} — ${dato}`);
+    const emne = encodeURIComponent(`Avviksmelding #${nr} (${alvor}) — ${dato}`);
     const kropp = encodeURIComponent(
-      `AVVIKSMELDING — Krambua\n\n` +
+      `AVVIKSSKJEMA — Krambua\n\n` +
+        `Avvik nr: ${nr}\n` +
         `Dato: ${dato}\n` +
-        `Kategori: ${kategori}\n` +
-        `Meldt av: ${namn} (brukarnamn: ${staten.brukarnamn})\n\n` +
-        `Kva skjedde:\n${skildring}\n\n` +
-        `Korrigerande tiltak:\n${tiltak || "(ikkje fylt ut)"}\n`
+        `Vurdert som: ${alvor}\n\n` +
+        `Kven oppdaga feilen: ${oppdaga} (brukarnamn: ${staten.brukarnamn})\n` +
+        `Rapportert til: ${rapportertTil}\n\n` +
+        `Beskriving av feilen:\n${skildring}\n\n` +
+        `Avviksbehandling (umiddelbart):\n${umiddelbart || "(ikkje fylt ut)"}\n\n` +
+        `Mogleg årsak:\n${arsak || "(ikkje fylt ut)"}\n\n` +
+        `Forslag til korrigerande tiltak:\n${tiltak || "(ikkje fylt ut)"}\n\n` +
+        `— Behandla av / dato / signatur / lukka dato fyllast ut av leiar —`
     );
     window.location.href = `mailto:${KRAMBUA_CONFIG.ADMIN_EPOST}?subject=${emne}&body=${kropp}`;
     bakgrunn.remove();
