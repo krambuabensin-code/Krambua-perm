@@ -2,5 +2,11 @@
   "admin": {
     "passordHash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"
   },
-  "tilsette": []
+  "tilsette": [
+    {
+      "namn": "Kristoffer Moe Tungesvik",
+      "brukarnamn": "Kritun",
+      "passordHash": "8e7655fdf6d6c39093a60b94f0d3cb96d4d19aaf8bff2ac2d08ce1d2ef492750"
+    }
+  ]
 }
