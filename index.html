@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="nn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1C1C19" />
+<title>Krambua — Perm for tilsette</title>
+<link rel="icon" href="assets/logo-k.png" />
+<link rel="apple-touch-icon" href="assets/logo-k.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="laster" class="laster-side">Lastar …</div>
+
+<div id="innlogging" class="skjult">
+  <div class="login-boks">
+    <div class="login-topp">
+      <img class="merke-full" src="assets/logo-full.png" alt="Krambua Bensin & Storkiosk" />
+      <p>Perm for HMS, reglar, rutinar og kontraktar</p>
+    </div>
+    <div class="login-kort" id="steg-brukar">
+      <label for="bn-felt">Brukarnamn</label>
+      <input id="bn-felt" placeholder="t.d. admin" autocapitalize="off" style="margin-bottom:14px;" />
+      <label for="pw-felt">Passord</label>
+      <input id="pw-felt" type="password" placeholder="••••••••" />
+      <div id="login-feil" class="login-feil"></div>
+      <button id="login-knapp">Logg inn</button>
+    </div>
+    <div class="login-kort skjult" id="steg-token">
+      <label for="token-felt">GitHub-token (berre for admin)</label>
+      <textarea id="token-felt" rows="3" placeholder="github_pat_..."></textarea>
+      <div class="hugs-rad">
+        <input type="checkbox" id="hugs-meg" checked />
+        <label for="hugs-meg" style="margin:0;">Hugs på denne eininga</label>
+      </div>
+      <div id="token-feil" class="login-feil"></div>
+      <button id="token-knapp">Gå vidare</button>
+    </div>
+    <p class="login-hjelp">
+      Standard admin er <b>admin</b> / <b>admin123</b> første gong — endre passordet under Tilsette.
+    </p>
+  </div>
+</div>
+
+<div id="app" class="skjult">
+  <div id="app-topp">
+    <div class="merke-rad">
+      <img src="assets/logo-k.png" alt="Krambua" />
+      <span class="undertekst">Perm for tilsette</span>
+    </div>
+    <div class="hoyre">
+      <span id="brukar-namn" class="brukar"></span>
+      <button id="logg-ut-knapp">Logg ut</button>
+    </div>
+  </div>
+  <div id="innhald"></div>
+</div>
+
+<div id="toast-rot"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
